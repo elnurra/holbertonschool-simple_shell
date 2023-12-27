@@ -1,1 +1,1 @@
-C - Simple Shell by Elnur Azizov and Vasif Oruczade
+C - Simple Shell by Elnur Azizov and Vasif Orujzada.
