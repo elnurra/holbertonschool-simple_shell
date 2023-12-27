@@ -1,44 +1,148 @@
-#include "shell.h"
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#define CHAR_BUFFER 1024
 /**
- * main - entry point
- * @ac: arg count
- * @av: arg vector
+ * line_devider - devide the line
+ * @buffer: string
  *
- * Return: 0 on success, 1 on error
+ * Return: char ptr to ptr
  */
-int main(int ac, char **av)
+char **line_devider(char *buffer)
 {
-	info_t info[] = { INFO_INIT };
-	int fd = 2;
-
-	asm ("mov %1, %0\n\t"
-		"add $3, %0"
-		: "=r" (fd)
-		: "r" (fd));
-
-	if (ac == 2)
+	char **arr;
+	char *token;
+	int i = 0;
+	arr = malloc((strlen(buffer) + 1) * sizeof(char *));
+	if (arr == NULL)
 	{
-		fd = open(av[1], O_RDONLY);
-		if (fd == -1)
-		{
-			if (errno == EACCES)
-				exit(126);
-			if (errno == ENOENT)
-			{
-				_eputs(av[0]);
-				_eputs(": 0: Can't open ");
-				_eputs(av[1]);
-				_eputchar('\n');
-				_eputchar(BUF_FLUSH);
-				exit(127);
-			}
-			return (EXIT_FAILURE);
-		}
-		info->readfd = fd;
+		perror("ERROR");
+		exit(1);
 	}
-	populate_env_list(info);
-	read_history(info);
-	hsh(info, av);
-	return (EXIT_SUCCESS);
+	token = strtok(buffer, " \n\t");
+	while (token)
+	{
+		arr[i] = strdup(token);
+		if (arr[i] == NULL)
+		{
+			perror("ERROR");
+			exit(1);
+		}
+		i++;
+		token = strtok(NULL, " \n\t");
+	}
+	arr[i] = NULL;
+	return (arr);
+}
+/**
+ * get_input - input part
+ * @len: len
+ * @buffer: buff
+ *
+ * Return: void
+ */
+char **get_input(char **buffer, size_t *len)
+{
+	int read;
+	char **arr;
+	if (isatty(STDIN_FILENO))
+		printf("$ ");
+	read = getline(buffer, len, stdin);
+	if (read == -1)
+	{
+		return (NULL);
+	}
+	arr = line_devider(*buffer);
+	return (arr);
+}
+/**
+ * free_array - free array memory
+ * @arr: buffer
+ *
+ * Return - nothing
+ */
+void free_array(char ***arr)
+{
+	int i;
+	for (i = 0; (*arr)[i] != NULL; i++)
+	{
+		free((*arr)[i]);
+	}
+	free(*arr);
+}
+char *path_handler(char *file_name)
+{
+	char *path = getenv("PATH");
+	char *token = strtok(path, ":");
+	char cmd[100];
+	if (file_name[0] == '/')
+	{
+		if (access(file_name, X_OK) == 0)
+		{
+			return strdup(file_name);
+		}
+		return NULL;
+	}
+	while (token)
+	{
+		snprintf(cmd,sizeof(cmd),"%s/%s",token,file_name);
+		if (access(cmd, X_OK) == 0)
+		{
+			return strdup(cmd);
+		}
+		token = strtok(NULL, ":");
+	}
+	free(token);
+	return strdup(file_name);
+}
+/**
+ * main - main func
+ *
+ * Return: int
+ */
+int main(void)
+{
+	extern char **environ;
+	char *buffer = NULL, **arr;
+	size_t len = 1024;
+	int status;
+	pid_t pid;
+	while (1)
+	{
+		arr = get_input(&buffer, &len);
+		if (arr == NULL)
+			break;
+		if (arr[0] == NULL)
+		{
+			free_array(&arr);
+			continue;
+		}
+		pid = fork();
+		if (pid == 0)
+		{
+			arr[0] = path_handler(arr[0]);
+			if (execve(arr[0], arr, environ) == -1)
+			{
+				perror("ERROR");
+				exit(1);
+			}
+		}
+		else if (pid > 0)
+		{
+			if (wait(&status) == -1)
+			{
+				perror("ERROR");
+			}
+		}
+		else
+			perror("ERROR");
+		if (pid == -1)
+			perror("ERROR");
+		free_array(&arr);
+	}
+	free(buffer);
+	return (0);
 }
