@@ -21,7 +21,10 @@ void *_calloc(unsigned int nmemb, unsigned int size);
 void _env(void);
 int execute(char **args);
 int empty_line(char *buff);
-
+char **line_devider(char *buffer);
+char **get_input(char **buffer, size_t *len);
+void free_array(char ***arr);
+char *path_handler(char *file_name);
 /* GLOBAL VAR*/
 extern char **environ;
 

@@ -1,50 +1,170 @@
-#include "shell.h"
-
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#define CHAR_BUFFER 1024
 /**
- * main - open shell, project base
+ * line_devider - devide the line
+ * @buffer: string
+ *
+ * Return: char ptr to ptr
+ */
+char **line_devider(char *buffer)
+{
+	char **arr;
+	char *token;
+	int i = 0;
+	arr = malloc((strlen(buffer) + 1) * sizeof(char *));
+	if (arr == NULL)
+	{
+		perror("ERROR");
+		exit(1);
+	}
+	token = strtok(buffer, " \n\t");
+	while (token)
+	{
+		arr[i] = strdup(token);
+		if (arr[i] == NULL)
+		{
+			perror("ERROR");
+			exit(1);
+		}
+		i++;
+		token = strtok(NULL, " \n\t");
+	}
+	arr[i] = NULL;
+	return (arr);
+}
+/**
+ * get_input - input part
+ * @len: len
+ * @buffer: buff
+ *
+ * Return: void
+ */
+char **get_input(char **buffer, size_t *len)
+{
+	int read;
+	char **arr;
+	if (isatty(STDIN_FILENO))
+		printf("$ ");
+	read = getline(buffer, len, stdin);
+	if (read == -1)
+	{
+		return (NULL);
+	}
+	arr = line_devider(*buffer);
+	return (arr);
+}
+/**
+ * free_array - free array memory
+ * @arr: buffer
+ *
+ * Return - nothing
+ */
+void free_array(char ***arr)
+{
+	int i;
+	for (i = 0; (*arr)[i] != NULL; i++)
+	{
+		free((*arr)[i]);
+	}
+	free(*arr);
+}
+char *path_handler(char *file_name)
+{
+    char *path = getenv("PATH");
+    char *token = strtok(path, ":");
+    char cmd[100];
+    if (token == NULL)
+    {
+        return  (NULL);
+    }
+    if (file_name[0] == '/')
+    {
+        if (access(file_name, X_OK) == 0)
+        {
+            return strdup(file_name);
+        }
+        return strdup(file_name);
+    }
+    while (token)
+    {
+        snprintf(cmd, sizeof(cmd), "%s/%s", token, file_name);
+        if (access(cmd, X_OK) == 0)
+        {
+            return strdup(cmd);
+        }
+        token = strtok(NULL, ":");
+    }
+    return strdup(file_name);
+}
+/**
+ * main - main func
+ *
  * Return: int
  */
-
-int main(void)
+int main(int argc, char **argv)
 {
-	char *buff = NULL, **args;
-	size_t read_size = 0;
-	ssize_t buff_size = 0;
-	int exit_status = 0;
-
+	extern char **environ;
+	char *buffer = NULL, **arr;
+	size_t len = argc * 512;
+	int status;
+	pid_t pid;
 	while (1)
 	{
-		if (isatty(0))
-			printf("hsh$ ");
-
-		buff_size = getline(&buff, &read_size, stdin);
-		if (buff_size == -1 || _strcmp("exit\n", buff) == 0)
-		{
-			free(buff);
+		arr = get_input(&buffer, &len);
+		if (arr == NULL)
 			break;
-		}
-		buff[buff_size - 1] = '\0';
-
-		if (_strcmp("env", buff) == 0)
+		if (arr[0] == NULL)
 		{
-			_env();
+			free_array(&arr);
 			continue;
 		}
-
-		if (empty_line(buff) == 1)
+		pid = fork();
+		if (pid == 0)
 		{
-			exit_status = 0;
-			continue;
+			char *original_command = strdup(arr[0]);
+			arr[0] = path_handler(arr[0]);
+			if (arr[0] == NULL)
+			{
+				char error_message[CHAR_BUFFER];
+				snprintf(error_message, sizeof(error_message), "%s: 1: %s: not found\n", argv[0], original_command);
+				write(STDERR_FILENO, error_message, strlen(error_message));
+				free(original_command);
+				exit(127);
+			}
+			else if (execve(arr[0], arr, environ) == -1)
+			{
+				perror("ERROR");
+				free(original_command);
+				exit(1);
+			}
 		}
-
-		args = _split(buff, " ");
-		args[0] = search_path(args[0]);
-
-		if (args[0] != NULL)
-			exit_status = execute(args);
+		else if (pid > 0)
+		{
+			if (waitpid(pid, &status, 0) == -1)
+			{
+				perror("ERROR");
+			}
+			if (WIFEXITED(status))
+			{
+				status = WEXITSTATUS(status);
+				if (status == 127)
+				{
+					exit(127);
+				}
+			}
+		}
 		else
-			perror("Error");
-		free(args);
+			perror("ERROR");
+		if (pid == -1)
+			perror("ERROR");
+		free_array(&arr);
 	}
-	return (exit_status);
+	free(buffer);
+	return (0);
 }
