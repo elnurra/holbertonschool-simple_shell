@@ -1,26 +1,22 @@
 #include "shell.h"
 /**
- * _strcat - This function appends the src string to the dest string
- * @dest: string agument
- * @src: string argument
- * Return: String
+ * _strncpy - copy n char
+ * @dest: string argument
+ * @src: string argument for src
+ * @n: integer argument
+ * Return: dest
  */
-char *_strcat(char *dest, char *src)
+char *_strncpy(char *dest, char *src, int n)
 {
-	int len = 0, lend = 0, j;
+	int i;
 
-	while (src[len] != '\0')
+	for (i = 0; i < n && src[i] != '\0'; i++)
 	{
-		len++;
+		dest[i] = src[i];
 	}
-	while (dest[lend] != '\0')
+	for (; i < n; i++)
 	{
-		lend++;
+		dest[i] = '\0';
 	}
-	for (j = 0; j < len; j++)
-	{
-		dest[lend + j] = src[j];
-	}
-	dest[lend + len] = '\0';
 	return (dest);
 }
