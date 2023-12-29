@@ -37,7 +37,6 @@ char **line_devider(char *buffer)
 		token = strtok(NULL, " \n\t");
 	}
 	arr[i] = NULL;
-	free(token);
 	return (arr);
 }
 /**
