@@ -1,48 +1,36 @@
 #include "shell.h"
+
 /**
- * main - Entry point to shell program
- * @argc: Number of arguments passed into the shell executable.
- * @argv: Vector containing arguments passed.
- *
- * Return: 0 on success or 1 on failure.
+ * main - function that executes input we type and gives us the output
+ * @ac: size of av
+ * @av: array size of ac
+ * Return: returns (0) in Success
  */
-int main(int argc, char **argv)
+
+int main(int ac, char **av)
 {
-	info_s info[] = {SET_INFO};
-	int fd = 2;
+	char *buffer = NULL, **cmmd = NULL;
+	int status = 0, i = 0;
+	(void)ac;
 
-	asm("mov %1, %0\n\t"
-		"add $3, %0"
-		: "=r"(fd)
-		: "r"(fd));
-
-	if (argc == 2)
+	while (1)
 	{
-		fd = open(argv[1], O_RDONLY);
-		if (fd == -1)
+		buffer = _getline();
+		if (buffer == NULL)
 		{
-			if (errno == EACCES)
-				exit(126);
-
-			if (errno == ENOENT)
-			{
-				puts_err(argv[0]);
-				puts_err(": 0: Can't open ");
-				puts_err(argv[1]);
-				putchar_err('\n');
-				putchar_err(NEG_ONE);
-				exit(127);
-			}
-
-			return (EXIT_FAILURE);
+			if (isatty(STDIN_FILENO))
+				write(STDOUT_FILENO, "\n", 1);
+			return (status);
 		}
+		i++;
 
-		info->fd_read = fd;
+		cmmd = _split(buffer);
+		if (!cmmd)
+			continue;
+
+		if (_builtin(cmmd[0]))
+			builtins_handler(cmmd, av, &status, i);
+		else
+			status = _exec(cmmd, av, i);
 	}
-
-	gather_env(info);
-	read_history(info);
-	shell_main(info, argv);
-
-	return (EXIT_SUCCESS);
 }
