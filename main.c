@@ -37,6 +37,7 @@ char **line_devider(char *buffer)
 		token = strtok(NULL, " \n\t");
 	}
 	arr[i] = NULL;
+	free(token);
 	return (arr);
 }
 /**
@@ -77,7 +78,6 @@ void free_array(char **arr)
 	{
 		free(arr[i]);
 	}
-	free(arr[i]);
 	free(arr);
 }
 /**
@@ -109,6 +109,7 @@ char *path_handler(char *file_name, char *path)
 		}
 		token = strtok(NULL, ":");
 	}
+	free(token);
 	return file_name;
 }
 /**
@@ -161,6 +162,7 @@ int main(int argc, char **argv)
 					exit(127);
 				}
 			}
+			free(arr[0]);
 			arr[0] = path_handler(arr[0], path);
 			if (strcmp(arr[0], "exit") == 0)
                         {
