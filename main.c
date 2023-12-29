@@ -17,6 +17,7 @@ char **line_devider(char *buffer)
 	char **arr;
 	char *token;
 	int i = 0;
+
 	arr = malloc((strlen(buffer) + 1) * sizeof(char *));
 	if (arr == NULL)
 	{
@@ -49,6 +50,7 @@ char **get_input(char **buffer, size_t *len)
 {
 	int read;
 	char **arr;
+
 	if (isatty(STDIN_FILENO))
 		printf("$ ");
 	read = getline(buffer, len, stdin);
@@ -65,42 +67,49 @@ char **get_input(char **buffer, size_t *len)
  *
  * Return - nothing
  */
-void free_array(char ***arr)
+void free_array(char **arr)
 {
 	int i;
-	for (i = 0; (*arr)[i] != NULL; i++)
+
+	if (arr == NULL)
+		return;
+	for (i = 0; arr[i] != NULL; i++)
 	{
-		free((*arr)[i]);
+		free(arr[i]);
 	}
-	free(*arr);
+	free(arr[i]);
+	free(arr);
 }
-char *path_handler(char *file_name)
+/**
+ * path_handler - path handler
+ * @file_name: name of file
+ *
+ * @path: path
+ *
+ * return: file_name
+ */
+char *path_handler(char *file_name, char *path)
 {
-    char *path = getenv("PATH");
-    char *token = strtok(path, ":");
-    char cmd[100];
-    if (token == NULL)
-    {
-        return  (NULL);
-    }
-    if (file_name[0] == '/')
-    {
-        if (access(file_name, X_OK) == 0)
-        {
-            return strdup(file_name);
-        }
-        return strdup(file_name);
-    }
-    while (token)
-    {
-        snprintf(cmd, sizeof(cmd), "%s/%s", token, file_name);
-        if (access(cmd, X_OK) == 0)
-        {
-            return strdup(cmd);
-        }
-        token = strtok(NULL, ":");
-    }
-    return strdup(file_name);
+	char *token = strtok(path, ":");
+	char cmd[100];
+
+	if (file_name[0] == '/')
+	{
+		if (access(file_name, X_OK) == 0)
+		{
+			return strdup(file_name);
+		}
+	}
+	while (token)
+	{
+		snprintf(cmd, sizeof(cmd), "%s/%s", token, file_name);
+		if (access(cmd, X_OK) == 0)
+		{
+			return strdup(cmd);
+		}
+		token = strtok(NULL, ":");
+	}
+	return file_name;
 }
 /**
  * main - main func
@@ -112,8 +121,9 @@ int main(int argc, char **argv)
 	extern char **environ;
 	char *buffer = NULL, **arr;
 	size_t len = argc * 512;
-	int status;
+	int status = 0;
 	pid_t pid;
+
 	while (1)
 	{
 		arr = get_input(&buffer, &len);
@@ -121,26 +131,49 @@ int main(int argc, char **argv)
 			break;
 		if (arr[0] == NULL)
 		{
-			free_array(&arr);
 			continue;
 		}
 		pid = fork();
 		if (pid == 0)
 		{
+			char *path = getenv("PATH");
 			char *original_command = strdup(arr[0]);
-			arr[0] = path_handler(arr[0]);
-			if (arr[0] == NULL)
+			if (path == NULL || *path == '\0')
 			{
-				char error_message[CHAR_BUFFER];
-				snprintf(error_message, sizeof(error_message), "%s: 1: %s: not found\n", argv[0], original_command);
-				write(STDERR_FILENO, error_message, strlen(error_message));
-				free(original_command);
-				exit(127);
+				if (arr[0][0] == '/')
+				{
+					arr[0] = path_handler(arr[0], path);
+					if (execve(arr[0], arr, environ) == -1)
+					{
+						perror("ERROR");
+						free(original_command);
+						free_array(arr);
+						exit(1);
+					}
+				}
+				else
+				{
+					char error_message[CHAR_BUFFER];
+					snprintf(error_message, sizeof(error_message), "%s: 1: %s: not found\n", argv[0], original_command);
+					write(STDERR_FILENO, error_message, strlen(error_message));
+					free(original_command);
+					free_array(arr);
+					exit(127);
+				}
 			}
-			else if (execve(arr[0], arr, environ) == -1)
+			arr[0] = path_handler(arr[0], path);
+			if (strcmp(arr[0], "exit") == 0)
+                        {
+                                free(buffer);
+                                free_array(arr);
+                                exit(EXIT_SUCCESS);
+                        }
+			if (execve(arr[0], arr, environ) == -1)
 			{
 				perror("ERROR");
 				free(original_command);
+				free_array(arr);
+				free(buffer);
 				exit(1);
 			}
 		}
@@ -152,19 +185,21 @@ int main(int argc, char **argv)
 			}
 			if (WIFEXITED(status))
 			{
-				status = WEXITSTATUS(status);
-				if (status == 127)
+				int exit_status = WEXITSTATUS(status);
+				if (exit_status == 127)
 				{
 					exit(127);
 				}
 			}
 		}
 		else
+		{
 			perror("ERROR");
+		}
 		if (pid == -1)
 			perror("ERROR");
-		free_array(&arr);
+		free_array(arr);
 	}
 	free(buffer);
-	return (0);
+	return (status);
 }
