@@ -1,86 +1,48 @@
 #include "shell.h"
-
 /**
- * read_command - reads command
+ * main - Entry point to shell program
+ * @argc: Number of arguments passed into the shell executable.
+ * @argv: Vector containing arguments passed.
  *
- * Return: string containing the command,
- * or NULL if an error occurs.
+ * Return: 0 on success or 1 on failure.
  */
-
-char *read_command(void)
+int main(int argc, char **argv)
 {
-	char *command = NULL;
-	size_t bufsize = 0;
-	ssize_t read_bytes = getline(&command, &bufsize, stdin);
+	info_s info[] = {SET_INFO};
+	int fd = 2;
 
-	if (read_bytes == -1)
+	asm("mov %1, %0\n\t"
+		"add $3, %0"
+		: "=r"(fd)
+		: "r"(fd));
+
+	if (argc == 2)
 	{
-		free(command);
-		return (NULL);
+		fd = open(argv[1], O_RDONLY);
+		if (fd == -1)
+		{
+			if (errno == EACCES)
+				exit(126);
+
+			if (errno == ENOENT)
+			{
+				puts_err(argv[0]);
+				puts_err(": 0: Can't open ");
+				puts_err(argv[1]);
+				putchar_err('\n');
+				putchar_err(NEG_ONE);
+				exit(127);
+			}
+
+			return (EXIT_FAILURE);
+		}
+
+		info->fd_read = fd;
 	}
-	if (command[read_bytes - 1] == '\n')
-		command[read_bytes - 1] = '\0';
-	return (command);
-}
 
-/**
- * parse_arguments - parse arguments
- *
- *
- *@command: The command string to parse.
- *@args: An array of strings to store the parsed arguments.
- */
+	gather_env(info);
+	read_history(info);
+	shell_main(info, argv);
 
-void parse_arguments(char *command, char **args)
-{
-	int arg_count = 0;
-	char *token;
-
-	token = strtok(command, " ");
-
-	while (token != NULL && arg_count < 63)
-	{
-		args[arg_count++] = token;
-		token = strtok(NULL, " ");
-	}
-	args[arg_count] = NULL;
-}
-
-/**
- * main - Entry poin
- *
- * Reads commands from the user and executes them.
- * Return: status
- */
-
-int main(void)
-{
-	int is_piped = !isatty(fileno(stdin));
-	char *command;
-	int status = 0;
-
-	while (1)
-	{
-		if (!is_piped)
-		{
-			printf("#cisfun$ ");
-			fflush(stdout);
-		}
-		command = read_command();
-		if (command == NULL)
-		{
-			break;
-		}
-		if (strcmp(command, "exit") == 0)
-		{
-			free(command);
-			exit(0);
-		}
-		status = execute_command(command);
-		if (status == 2 && is_piped)
-		{
-			exit(2);
-		}
-	}
-	return (status);
+	return (EXIT_SUCCESS);
 }
