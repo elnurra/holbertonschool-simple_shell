@@ -1,14 +1,21 @@
 #ifndef MAIN_H
 #define MAIN_H
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-extern char **environ;
 
-int delim_counter(char *str, char *delim);
-char **token_parse(char *str, char *delim);
-char *check_file(char **path_arr, char *filepath, int *flag);
-int execute(char **args, char *filename, int *status);
-void _printenv(void);
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <string.h>
+extern char **environ;
+char *read_command(void);
+void parse_arguments(char *command, char **args);
+int execute_command(char *command);
+void search_and_execute(char *args[], char *command);
+int main(void);
+
+
 #endif
